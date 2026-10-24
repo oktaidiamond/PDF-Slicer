@@ -385,22 +385,25 @@ header h1 {
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script>
-'use strict';
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs" integrity="sha384-+0ti2moQlmLN7WZHE2RHIf5lV8hHxhxEalN0il3YZceG26fUPyOkR0hp9daxk1i7" crossorigin="anonymous"></script>
+<script type="module">
+if (!globalThis.pdfjsLib || !globalThis.PDFLib) {
+  document.querySelector('#empty p').textContent = "Couldn't load the PDF libraries. Check your connection and reload.";
+  throw new Error('PDF libraries failed to load');
+}
 const { PDFDocument } = PDFLib;
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 
 const WORKERS = 4;
-const LAYOUTS = { 2: [1, 2], 4: [2, 2], 6: [2, 3], 9: [3, 3] };
+const LAYOUTS = { 2: [[1, 2], [2, 1]], 4: [[2, 2]], 6: [[2, 3], [3, 2]], 9: [[3, 3]] };
 const JUMP_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const FILE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 
 const sources = [], ranges = [];
 let active = null, thumbs = [];
-let gridId = 0, queueId = 0, focusPage = 1;
+let gridId = 0, focusPage = 1, inflight = 0, pumpQueued = false;
+const nearSet = new Set();
 let cols = 2, nUp = 1;
 
 const $ = id => document.getElementById(id);
@@ -462,7 +465,8 @@ $('scale-btns').addEventListener('click', async e => {
   cols = +btn.dataset.c;
   if (!active) return;
   const target = focusPage, frac = pageFraction(target);
-  if (await buildGrid()) restoreScroll(target, frac);
+  buildGrid();
+  restoreScroll(target, frac);
 });
 
 $('nup-btns').addEventListener('click', e => {
@@ -519,24 +523,34 @@ async function loadFiles(files) {
   for (const file of pdfs) {
     try {
       const ab = await file.arrayBuffer();
-      const copy = ab.slice(0);
-      const pjs = await pdfjsLib.getDocument({ data: ab }).promise;
-      const plib = await PDFDocument.load(copy);
+      const plib = await PDFDocument.load(ab.slice(0));
+      const pjs = await pdfjsLib.getDocument({ data: ab, isEvalSupported: false }).promise;
       const src = {
         tag: nextTag(), name: file.name, base: file.name.replace(/\.pdf$/i, ''),
-        pjs, plib, pages: pjs.numPages, focus: 1, frac: null
+        pjs, plib, pages: pjs.numPages, aspects: pageAspects(plib), focus: 1, frac: null
       };
       sources.push(src);
       addSourceRow(src);
       addRange(src, 1, src.pages);
       last = src;
     } catch (err) {
-      alert(`Could not load ${file.name}: ${err.message}`);
+      const locked = /is encrypted/.test(err?.message) || err?.name === 'PasswordException';
+      alert(locked
+        ? `${file.name} is encrypted, so it can't be sliced. Printing it to a new PDF usually removes the encryption.`
+        : `Could not load ${file.name}: ${err.message}`);
     }
   }
   clearStatus();
   syncAll();
   if (last) await show(last);
+}
+
+function pageAspects(plib) {
+  return plib.getPages().map(p => {
+    const b = p.getCropBox();
+    const rot = ((p.getRotation().angle % 360) + 360) % 360;
+    return rot % 180 ? `${b.height} / ${b.width}` : `${b.width} / ${b.height}`;
+  });
 }
 
 function addSourceRow(src) {
@@ -559,8 +573,6 @@ function removeSource(src) {
   src.pjs.destroy();
   if (active === src) {
     active = null;
-    gridId++;
-    queueId++;
     clearGrid();
     if (sources.length) show(sources[0]);
   }
@@ -576,16 +588,47 @@ async function show(src) {
   active = src;
   focusPage = src.focus;
   syncAll();
-  if (!(await buildGrid())) return;
+  buildGrid();
   if (src.frac === null) {
     grid.scrollTop = 0;
-    queueRender();
+    schedulePump();
   } else {
     restoreScroll(src.focus, src.frac);
   }
 }
 
+const nearIO = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    const n = +e.target.dataset.n;
+    if (e.isIntersecting) nearSet.add(n);
+    else nearSet.delete(n);
+  }
+  schedulePump();
+}, { root: grid, rootMargin: '100% 0px' });
+
+const keepIO = new IntersectionObserver(entries => {
+  for (const e of entries) if (!e.isIntersecting) evict(thumbs[+e.target.dataset.n]);
+}, { root: grid, rootMargin: '300% 0px' });
+
+function evict(t) {
+  if (!t) return;
+  t.job = null;
+  t.task?.cancel();
+  t.task = null;
+  if (t.canvas) {
+    t.canvas.width = t.canvas.height = 0;
+    t.canvas = null;
+    t.wrap.replaceChildren();
+  }
+  t.state = 0;
+}
+
 function clearGrid() {
+  gridId++;
+  nearIO.disconnect();
+  keepIO.disconnect();
+  nearSet.clear();
+  thumbs.forEach(evict);
   thumbs = [];
   grid.replaceChildren();
   grid.style.display = 'none';
@@ -593,34 +636,31 @@ function clearGrid() {
   legend.style.display = 'none';
 }
 
-async function buildGrid() {
-  const g = ++gridId, src = active;
-  queueId++;
-  const vp = (await src.pjs.getPage(1)).getViewport({ scale: 1 });
-  if (g !== gridId) return false;
+function buildGrid() {
   clearGrid();
+  const src = active;
   grid.style.setProperty('--cols', cols);
-  const ar = `${vp.width} / ${vp.height}`;
   const frag = document.createDocumentFragment();
   for (let n = 1; n <= src.pages; n++) {
     const th = document.createElement('div');
     const wrap = document.createElement('div');
     const lbl = document.createElement('div');
     th.className = 'thumb';
+    th.dataset.n = n;
     wrap.className = 'thumb-wrap';
-    wrap.style.aspectRatio = ar;
+    wrap.style.aspectRatio = src.aspects[n - 1];
     lbl.className = 'thumb-num';
     lbl.textContent = n;
     th.append(wrap, lbl);
     frag.append(th);
-    thumbs[n] = { th, wrap, lbl, state: 0 };
+    thumbs[n] = { th, wrap, lbl, state: 0, job: null, task: null, canvas: null };
   }
   empty.style.display = 'none';
   legend.style.display = 'flex';
   grid.style.display = '';
   grid.append(frag);
+  thumbs.forEach(t => { nearIO.observe(t.th); keepIO.observe(t.th); });
   syncHighlights();
-  return true;
 }
 
 function pageFraction(n) {
@@ -636,7 +676,7 @@ function restoreScroll(n, frac) {
   const r = t.getBoundingClientRect();
   grid.scrollTop += (r.top - grid.getBoundingClientRect().top) + frac * r.height;
   focusPage = n;
-  queueRender();
+  schedulePump();
 }
 
 let scrollTick = false;
@@ -655,6 +695,7 @@ grid.addEventListener('scroll', () => {
       else lo = mid + 1;
     }
     focusPage = best;
+    schedulePump();
   });
 });
 
@@ -663,7 +704,7 @@ function jump(n, smooth = true) {
   if (!t) return;
   focusPage = n;
   t.th.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
-  queueRender();
+  schedulePump();
 }
 
 async function goto(r, key) {
@@ -671,40 +712,59 @@ async function goto(r, key) {
   if (active === r.src) jump(r[key]);
 }
 
-function queueRender() {
-  if (!active) return;
-  const q = ++queueId, g = gridId, f = focusPage, doc = active.pjs, total = active.pages;
-  const sel = activePages();
-  const near = cols * 4;
-  const tier = n => Math.abs(n - f) <= near ? 0 : sel.has(n) ? 1 : 2;
-  const queue = [];
-  for (let n = 1; n <= total; n++) if (thumbs[n]?.state === 0) queue.push(n);
-  queue.sort((a, b) => tier(a) - tier(b) || Math.abs(a - f) - Math.abs(b - f));
-  let i = 0;
-  const worker = async () => {
-    while (q === queueId && i < queue.length) await renderOne(queue[i++], g, doc);
-  };
-  for (let k = 0; k < WORKERS; k++) worker();
+function schedulePump() {
+  if (pumpQueued) return;
+  pumpQueued = true;
+  requestAnimationFrame(() => {
+    pumpQueued = false;
+    pump();
+  });
 }
 
-async function renderOne(n, g, doc) {
-  const t = thumbs[n];
-  if (!t || t.state !== 0) return;
+function pump() {
+  while (inflight < WORKERS) {
+    let best = 0, bestD = Infinity;
+    for (const n of nearSet) {
+      if (thumbs[n]?.state !== 0) continue;
+      const d = Math.abs(n - focusPage);
+      if (d < bestD) { bestD = d; best = n; }
+    }
+    if (!best) return;
+    renderOne(thumbs[best], best);
+  }
+}
+
+async function renderOne(t, n) {
+  const job = t.job = {};
+  const doc = active.pjs;
   t.state = 1;
+  inflight++;
+  let canvas = null;
   try {
     const page = await doc.getPage(n);
-    const w = t.wrap.clientWidth || grid.clientWidth / cols;
-    const vp = page.getViewport({ scale: w / page.getViewport({ scale: 1 }).width });
-    const canvas = document.createElement('canvas');
-    canvas.width = vp.width;
-    canvas.height = vp.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-    if (g !== gridId) return;
-    t.wrap.style.aspectRatio = '';
-    t.wrap.replaceChildren(canvas);
+    if (t.job !== job) return;
+    const vp = page.getViewport({ scale: t.wrap.clientWidth / page.getViewport({ scale: 1 }).width });
+    canvas = document.createElement('canvas');
+    canvas.width = Math.round(vp.width);
+    canvas.height = Math.round(vp.height);
+    t.task = page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
+    await t.task.promise;
+    if (t.job !== job) return;
+    t.task = null;
+    t.canvas = canvas;
+    canvas = null;
+    t.wrap.replaceChildren(t.canvas);
     t.state = 2;
   } catch {
-    if (g === gridId) t.state = 0;
+    if (t.job === job) {
+      t.job = null;
+      t.task = null;
+      t.state = 0;
+    }
+  } finally {
+    if (canvas) canvas.width = canvas.height = 0;
+    inflight--;
+    schedulePump();
   }
 }
 
@@ -752,7 +812,6 @@ function addRange(src, from, to) {
     });
     inp.addEventListener('blur', () => {
       inp.value = r[key];
-      queueRender();
     });
     inp.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
@@ -771,7 +830,6 @@ function addRange(src, from, to) {
   rm.addEventListener('click', () => {
     removeRange(r);
     syncAll();
-    queueRender();
   });
 
   row.append(chip, field('From', 'from'), field('To', 'to'), rm);
@@ -914,9 +972,10 @@ extractBtn.addEventListener('click', async () => {
     if (nUp === 1) {
       ordered.forEach(p => out.addPage(p));
     } else {
-      const [c, rws] = LAYOUTS[nUp];
       const cellW = Math.max(...ordered.map(e => e.width));
       const cellH = Math.max(...ordered.map(e => e.height));
+      const squareness = ([c, r]) => Math.abs(Math.log((c * cellW) / (r * cellH)));
+      const [c, rws] = LAYOUTS[nUp].reduce((a, b) => squareness(b) < squareness(a) ? b : a);
       for (let i = 0; i < ordered.length; i += nUp) {
         const sheet = out.addPage([cellW * c, cellH * rws]);
         ordered.slice(i, i + nUp).forEach((emb, j) => {
