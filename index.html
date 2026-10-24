@@ -86,8 +86,7 @@ header h1 {
   cursor: pointer;
   transition: border-color .15s, background .15s;
 }
-.dropzone:hover, .dropzone.over { border-color: var(--ink-3); background: var(--bg-2); }
-.dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.dropzone:hover, #sec-src.over .dropzone { border-color: var(--ink-3); background: var(--bg-2); }
 .dropzone svg { display: block; margin: 0 auto 8px; color: var(--ink-4); }
 .dropzone p { font-size: 13px; color: var(--ink-3); line-height: 1.6; }
 .dropzone p strong { color: var(--ink-2); font-weight: 500; }
@@ -103,12 +102,23 @@ header h1 {
   flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .file-info .pages { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex-shrink: 0; }
-.file-info .change {
-  background: none; border: none; padding: 0;
-  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
-  cursor: pointer; text-decoration: underline; text-underline-offset: 2px; flex-shrink: 0;
+.src-list { display: flex; flex-direction: column; gap: 6px; max-height: 168px; overflow-y: auto; }
+.src-row { cursor: pointer; transition: border-color .12s; }
+.multi .src-row.active { border-color: var(--ink-3); }
+.tag, .src-chip { font-family: var(--mono); color: var(--ink-2); border-radius: 2px; flex-shrink: 0; }
+.tag {
+  display: none; width: 18px; height: 18px; align-items: center; justify-content: center;
+  font-size: 10px; background: var(--bg-3);
 }
-.file-info .change:hover { color: var(--ink); }
+.multi .tag { display: flex; }
+.multi .src-row > svg { display: none; }
+.src-rm {
+  background: none; border: none; padding: 0 2px;
+  font-size: 15px; line-height: 1; color: var(--ink-4); cursor: pointer; flex-shrink: 0;
+  transition: color .12s;
+}
+.src-rm:hover { color: var(--red); }
+#sec-src.over .add-btn { border-color: var(--ink-3); color: var(--ink-2); background: var(--bg-2); }
 
 .ranges-scroll { flex: 1; overflow-y: auto; padding: 18px 20px; }
 .ranges-scroll .label { margin-bottom: 12px; }
@@ -121,6 +131,28 @@ header h1 {
   gap: 5px;
   align-items: end;
 }
+.multi .range-row { grid-template-columns: 32px 1fr 1fr 28px; }
+.src-chip {
+  display: none; height: 32px; font-size: 11px;
+  background: var(--bg-2); border: 1px solid var(--bg-3); cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.src-chip:hover, .src-chip.open { border-color: var(--ink-3); color: var(--ink); }
+.src-menu {
+  position: fixed; z-index: 10; display: none; flex-direction: column; gap: 2px;
+  min-width: 220px; max-width: 300px; max-height: 260px; overflow-y: auto; padding: 4px;
+  background: var(--bg-2); border: 1px solid var(--ink-4); border-radius: var(--r);
+}
+.src-menu.open { display: flex; }
+.src-opt {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  background: none; border: none; border-radius: 2px; cursor: pointer; text-align: left;
+  font-family: var(--mono); font-size: 12px; color: var(--ink);
+}
+.src-opt:hover, .src-opt.current { background: var(--bg-3); }
+.src-opt .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.src-opt .pages { font-size: 11px; color: var(--ink-3); flex-shrink: 0; }
+.multi .src-chip { display: block; }
 .range-field { display: flex; flex-direction: column; gap: 3px; }
 .range-field label { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
 .input-wrap { position: relative; }
@@ -137,7 +169,7 @@ header h1 {
   width: 100%;
   font-family: var(--mono); font-size: 13px; color: var(--ink);
   background: var(--bg-2); border: 1px solid var(--bg-3); border-radius: var(--r);
-  padding: 6px 30px 6px 9px; outline: none;
+  height: 32px; padding: 0 30px 0 9px; outline: none;
   transition: border-color .12s;
   appearance: textfield; -moz-appearance: textfield;
 }
@@ -162,6 +194,7 @@ header h1 {
   cursor: pointer; letter-spacing: .04em; transition: border-color .12s, color .12s;
 }
 .add-btn:hover { border-color: var(--ink-3); color: var(--ink-2); }
+.add-btn:disabled { opacity: .4; cursor: not-allowed; border-color: var(--bg-3); color: var(--ink-3); }
 
 .actions { padding: 14px 20px; border-top: 1px solid var(--bg-3); flex-shrink: 0; }
 .extract-btn {
@@ -182,6 +215,12 @@ header h1 {
   display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
 }
 .preview-top .label { margin: 0; }
+.preview-top-left { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.preview-src {
+  display: none; font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.multi .preview-src { display: block; }
 .preview-top-right { display: flex; align-items: center; gap: 12px; }
 .legend { display: none; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue-glow); border: 1.5px solid var(--blue); }
@@ -267,36 +306,25 @@ header h1 {
   <header><h1>PDF Slicer</h1></header>
 
   <aside class="sidebar">
-    <div class="sidebar-section" id="sec-drop">
-      <div class="label">Source</div>
+    <div class="sidebar-section" id="sec-src">
+      <div class="label">Sources</div>
+      <input type="file" accept=".pdf,application/pdf" id="file-input" multiple hidden>
       <div class="dropzone" id="dropzone">
-        <input type="file" accept=".pdf" id="file-input">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
           <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
         </svg>
-        <p><strong>Drop PDF here</strong><br>or click to browse</p>
+        <p><strong>Drop PDFs here</strong><br>or click to browse</p>
       </div>
-    </div>
-
-    <div class="sidebar-section" id="sec-file" style="display:none">
-      <div class="label">Source</div>
-      <div class="file-info">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-        </svg>
-        <span class="name" id="fname"></span>
-        <span class="pages" id="fpages"></span>
-        <button class="change" id="change-btn">change</button>
-      </div>
+      <div class="src-list" id="src-list"></div>
+      <button class="add-btn" id="add-src" style="display:none">+ add PDF</button>
     </div>
 
     <div class="ranges-scroll">
       <div class="label">Page ranges</div>
       <div class="range-list" id="range-list"></div>
-      <button class="add-btn" id="add-btn">+ add range</button>
+      <button class="add-btn" id="add-btn" disabled>+ add range</button>
     </div>
 
     <div class="sidebar-section combine-section">
@@ -326,7 +354,10 @@ header h1 {
 
   <div class="preview">
     <div class="preview-top">
-      <div class="label">Preview</div>
+      <div class="preview-top-left">
+        <div class="label">Preview</div>
+        <div class="preview-src" id="preview-src"></div>
+      </div>
       <div class="preview-top-right">
         <div class="legend" id="legend"><div class="legend-dot"></div>in range</div>
         <div class="scale-btns" id="scale-btns">
@@ -365,21 +396,60 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 const WORKERS = 4;
 const LAYOUTS = { 2: [1, 2], 4: [2, 2], 6: [2, 3], 9: [3, 3] };
 const JUMP_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const FILE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 
-let pjsDoc = null, plibDoc = null, totalPgs = 0, currentFile = '';
+const sources = [], ranges = [];
+let active = null, thumbs = [];
 let gridId = 0, queueId = 0, focusPage = 1;
 let cols = 2, nUp = 1;
-let thumbs = [];
-const ranges = [];
 
 const $ = id => document.getElementById(id);
-const secDrop = $('sec-drop'), secFile = $('sec-file');
+const app = $('app'), secSrc = $('sec-src');
 const dropzone = $('dropzone'), fileInput = $('file-input');
-const fname = $('fname'), fpages = $('fpages');
+const srcList = $('src-list'), addSrcBtn = $('add-src');
 const rangeList = $('range-list'), addBtn = $('add-btn');
 const extractBtn = $('extract-btn'), hint = $('hint'), note = $('combine-note');
-const grid = $('grid'), empty = $('empty'), legend = $('legend');
+const grid = $('grid'), empty = $('empty'), legend = $('legend'), previewSrc = $('preview-src');
 const statusEl = $('status'), statusTxt = $('status-text');
+
+const menu = document.createElement('div');
+menu.className = 'src-menu';
+app.append(menu);
+let menuFor = null;
+
+function openMenu(r) {
+  if (menuFor === r) return closeMenu();
+  closeMenu();
+  menuFor = r;
+  menu.replaceChildren(...sources.map(src => {
+    const b = document.createElement('button');
+    b.className = 'src-opt' + (src === r.src ? ' current' : '');
+    b.innerHTML = `<span class="tag">${src.tag}</span><span class="name"></span><span class="pages">${src.pages}p</span>`;
+    b.querySelector('.name').textContent = src.name;
+    b.addEventListener('click', () => { closeMenu(); setSource(r, src); });
+    return b;
+  }));
+  const c = r.chip.getBoundingClientRect();
+  menu.style.left = `${c.left}px`;
+  menu.style.top = `${c.bottom + 4}px`;
+  menu.classList.add('open');
+  r.chip.classList.add('open');
+  const m = menu.getBoundingClientRect();
+  if (m.bottom > innerHeight - 8) menu.style.top = `${Math.max(8, c.top - 4 - m.height)}px`;
+}
+
+function closeMenu() {
+  if (!menuFor) return;
+  menuFor.chip.classList.remove('open');
+  menu.classList.remove('open');
+  menuFor = null;
+}
+
+document.addEventListener('pointerdown', e => {
+  if (menuFor && !menu.contains(e.target) && !menuFor.chip.contains(e.target)) closeMenu();
+});
+window.addEventListener('resize', closeMenu);
+document.querySelector('.ranges-scroll').addEventListener('scroll', closeMenu);
 
 function setActive(groupId, btn) {
   $(groupId).querySelectorAll('.scale-btn').forEach(b => b.classList.toggle('active', b === btn));
@@ -390,11 +460,9 @@ $('scale-btns').addEventListener('click', async e => {
   if (!btn) return;
   setActive('scale-btns', btn);
   cols = +btn.dataset.c;
-  if (!pjsDoc) return;
-  const target = focusPage;
-  const frac = pageFraction(target);
-  await buildGrid();
-  restoreScroll(target, frac);
+  if (!active) return;
+  const target = focusPage, frac = pageFraction(target);
+  if (await buildGrid()) restoreScroll(target, frac);
 });
 
 $('nup-btns').addEventListener('click', e => {
@@ -406,6 +474,7 @@ $('nup-btns').addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && menuFor) { closeMenu(); return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
   const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' || e.key === '_' ? -1 : 0;
@@ -416,58 +485,104 @@ document.addEventListener('keydown', e => {
   btns[Math.min(Math.max(i + dir, 0), btns.length - 1)].click();
 });
 
-fileInput.addEventListener('change', e => { if (e.target.files[0]) load(e.target.files[0]); });
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
-dropzone.addEventListener('drop', e => {
+dropzone.addEventListener('click', () => fileInput.click());
+addSrcBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { loadFiles(fileInput.files); fileInput.value = ''; });
+
+let dragDepth = 0;
+document.addEventListener('dragenter', e => { e.preventDefault(); if (++dragDepth === 1) secSrc.classList.add('over'); });
+document.addEventListener('dragleave', () => { if (--dragDepth === 0) secSrc.classList.remove('over'); });
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
   e.preventDefault();
-  dropzone.classList.remove('over');
-  const f = e.dataTransfer.files[0];
-  if (f?.type === 'application/pdf') load(f);
+  dragDepth = 0;
+  secSrc.classList.remove('over');
+  loadFiles(e.dataTransfer.files);
 });
 document.addEventListener('paste', e => {
-  for (const item of e.clipboardData?.items ?? [])
-    if (item.type === 'application/pdf') { load(item.getAsFile()); break; }
+  const files = [...(e.clipboardData?.items ?? [])].filter(i => i.type === 'application/pdf').map(i => i.getAsFile());
+  if (files.length) loadFiles(files);
 });
-$('change-btn').addEventListener('click', reset);
 
-async function load(file) {
-  showStatus('Loading\u2026');
-  try {
-    const ab = await file.arrayBuffer();
-    const copy = ab.slice(0);
-    pjsDoc = await pdfjsLib.getDocument({ data: ab }).promise;
-    plibDoc = await PDFDocument.load(copy);
-    totalPgs = pjsDoc.numPages;
-    currentFile = file.name.replace(/\.pdf$/i, '');
-    fname.textContent = file.name;
-    fpages.textContent = `${totalPgs} page${totalPgs !== 1 ? 's' : ''}`;
-    secDrop.style.display = 'none';
-    secFile.style.display = 'block';
-    if (ranges.length === 0) addRange(1, totalPgs);
-    syncBtn();
-    await buildGrid();
-    jump(ranges.find(r => !invalid(r))?.from ?? 1, false);
-    clearStatus();
-  } catch (err) {
-    clearStatus();
-    alert('Could not load PDF: ' + err.message);
+function nextTag() {
+  for (let i = 0; ; i++) {
+    const t = i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
+    if (!sources.some(s => s.tag === t)) return t;
   }
 }
 
-function reset() {
-  pjsDoc = plibDoc = null;
-  totalPgs = 0;
-  focusPage = 1;
-  gridId++;
-  queueId++;
-  clearGrid();
-  ranges.length = 0;
-  rangeList.replaceChildren();
-  fileInput.value = '';
-  secFile.style.display = 'none';
-  secDrop.style.display = 'block';
-  syncBtn();
+async function loadFiles(files) {
+  const pdfs = [...files].filter(f => f && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)));
+  if (!pdfs.length) return;
+  showStatus('Loading…');
+  let last = null;
+  for (const file of pdfs) {
+    try {
+      const ab = await file.arrayBuffer();
+      const copy = ab.slice(0);
+      const pjs = await pdfjsLib.getDocument({ data: ab }).promise;
+      const plib = await PDFDocument.load(copy);
+      const src = {
+        tag: nextTag(), name: file.name, base: file.name.replace(/\.pdf$/i, ''),
+        pjs, plib, pages: pjs.numPages, focus: 1, frac: null
+      };
+      sources.push(src);
+      addSourceRow(src);
+      addRange(src, 1, src.pages);
+      last = src;
+    } catch (err) {
+      alert(`Could not load ${file.name}: ${err.message}`);
+    }
+  }
+  clearStatus();
+  syncAll();
+  if (last) await show(last);
+}
+
+function addSourceRow(src) {
+  const row = document.createElement('div');
+  row.className = 'file-info src-row';
+  row.title = src.name;
+  row.innerHTML = `<span class="tag">${src.tag}</span>${FILE_ICON}<span class="name"></span><span class="pages">${src.pages} page${src.pages !== 1 ? 's' : ''}</span><button class="src-rm" title="Remove">\xd7</button>`;
+  row.querySelector('.name').textContent = src.name;
+  row.addEventListener('click', e => { if (!e.target.closest('.src-rm')) show(src); });
+  row.querySelector('.src-rm').addEventListener('click', () => removeSource(src));
+  srcList.append(row);
+  src.row = row;
+}
+
+function removeSource(src) {
+  closeMenu();
+  sources.splice(sources.indexOf(src), 1);
+  src.row.remove();
+  ranges.filter(r => r.src === src).forEach(removeRange);
+  src.pjs.destroy();
+  if (active === src) {
+    active = null;
+    gridId++;
+    queueId++;
+    clearGrid();
+    if (sources.length) show(sources[0]);
+  }
+  syncAll();
+}
+
+async function show(src) {
+  if (active === src) return;
+  if (active && thumbs.length) {
+    active.focus = focusPage;
+    active.frac = pageFraction(focusPage);
+  }
+  active = src;
+  focusPage = src.focus;
+  syncAll();
+  if (!(await buildGrid())) return;
+  if (src.frac === null) {
+    grid.scrollTop = 0;
+    queueRender();
+  } else {
+    restoreScroll(src.focus, src.frac);
+  }
 }
 
 function clearGrid() {
@@ -479,15 +594,15 @@ function clearGrid() {
 }
 
 async function buildGrid() {
-  const g = ++gridId;
+  const g = ++gridId, src = active;
   queueId++;
-  const vp = (await pjsDoc.getPage(1)).getViewport({ scale: 1 });
-  if (g !== gridId) return;
+  const vp = (await src.pjs.getPage(1)).getViewport({ scale: 1 });
+  if (g !== gridId) return false;
   clearGrid();
   grid.style.setProperty('--cols', cols);
   const ar = `${vp.width} / ${vp.height}`;
   const frag = document.createDocumentFragment();
-  for (let n = 1; n <= totalPgs; n++) {
+  for (let n = 1; n <= src.pages; n++) {
     const th = document.createElement('div');
     const wrap = document.createElement('div');
     const lbl = document.createElement('div');
@@ -505,6 +620,7 @@ async function buildGrid() {
   grid.style.display = '';
   grid.append(frag);
   syncHighlights();
+  return true;
 }
 
 function pageFraction(n) {
@@ -529,8 +645,9 @@ grid.addEventListener('scroll', () => {
   scrollTick = true;
   requestAnimationFrame(() => {
     scrollTick = false;
+    if (!active) return;
     const top = grid.getBoundingClientRect().top;
-    let lo = 1, hi = totalPgs, best = focusPage;
+    let lo = 1, hi = active.pages, best = focusPage;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
       if (!thumbs[mid]) break;
@@ -549,27 +666,33 @@ function jump(n, smooth = true) {
   queueRender();
 }
 
+async function goto(r, key) {
+  await show(r.src);
+  if (active === r.src) jump(r[key]);
+}
+
 function queueRender() {
-  const q = ++queueId, g = gridId, f = focusPage;
-  const sel = new Set(selectedPages());
+  if (!active) return;
+  const q = ++queueId, g = gridId, f = focusPage, doc = active.pjs, total = active.pages;
+  const sel = activePages();
   const near = cols * 4;
   const tier = n => Math.abs(n - f) <= near ? 0 : sel.has(n) ? 1 : 2;
   const queue = [];
-  for (let n = 1; n <= totalPgs; n++) if (thumbs[n]?.state === 0) queue.push(n);
+  for (let n = 1; n <= total; n++) if (thumbs[n]?.state === 0) queue.push(n);
   queue.sort((a, b) => tier(a) - tier(b) || Math.abs(a - f) - Math.abs(b - f));
   let i = 0;
   const worker = async () => {
-    while (q === queueId && i < queue.length) await renderOne(queue[i++], g);
+    while (q === queueId && i < queue.length) await renderOne(queue[i++], g, doc);
   };
   for (let k = 0; k < WORKERS; k++) worker();
 }
 
-async function renderOne(n, g) {
+async function renderOne(n, g, doc) {
   const t = thumbs[n];
   if (!t || t.state !== 0) return;
   t.state = 1;
   try {
-    const page = await pjsDoc.getPage(n);
+    const page = await doc.getPage(n);
     const w = t.wrap.clientWidth || grid.clientWidth / cols;
     const vp = page.getViewport({ scale: w / page.getViewport({ scale: 1 }).width });
     const canvas = document.createElement('canvas');
@@ -581,12 +704,12 @@ async function renderOne(n, g) {
     t.wrap.replaceChildren(canvas);
     t.state = 2;
   } catch {
-    t.state = 0;
+    if (g === gridId) t.state = 0;
   }
 }
 
 function syncHighlights() {
-  const sel = new Set(selectedPages());
+  const sel = activePages();
   thumbs.forEach((t, n) => {
     const inR = sel.has(n);
     t.wrap.classList.toggle('in-range', inR);
@@ -595,12 +718,17 @@ function syncHighlights() {
   });
 }
 
-function addRange(from, to) {
-  const r = { from, to };
+function addRange(src, from, to) {
+  const r = { src, from, to, inputs: [] };
   ranges.push(r);
-  const inputs = [];
   const row = document.createElement('div');
   row.className = 'range-row';
+  r.row = row;
+
+  const chip = document.createElement('button');
+  chip.className = 'src-chip';
+  r.chip = chip;
+  chip.addEventListener('click', () => openMenu(r));
 
   const field = (text, key) => {
     const wrap = document.createElement('div');
@@ -610,14 +738,15 @@ function addRange(from, to) {
     inp.type = 'number';
     inp.min = 1;
     inp.value = r[key];
+    inp.dataset.key = key;
     wrap.querySelector('.input-wrap').prepend(inp);
-    inputs.push(inp);
+    r.inputs.push(inp);
 
-    inp.addEventListener('focus', () => inp.select());
+    inp.addEventListener('focus', () => { inp.select(); show(r.src); });
     inp.addEventListener('input', () => {
       const v = parseInt(inp.value, 10);
-      r[key] = Math.min(Math.max(isNaN(v) ? 1 : v, 1), totalPgs || Infinity);
-      inputs.forEach(i => i.classList.toggle('err', invalid(r)));
+      r[key] = Math.min(Math.max(isNaN(v) ? 1 : v, 1), r.src.pages);
+      syncErrors(r);
       syncHighlights();
       syncBtn();
     });
@@ -628,10 +757,10 @@ function addRange(from, to) {
     inp.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
       inp.value = r[key];
-      jump(r[key]);
+      goto(r, key);
       inp.select();
     });
-    wrap.querySelector('.jump').addEventListener('click', () => jump(r[key]));
+    wrap.querySelector('.jump').addEventListener('click', () => goto(r, key));
     return wrap;
   };
 
@@ -640,45 +769,89 @@ function addRange(from, to) {
   rm.title = 'Remove';
   rm.textContent = '\xd7';
   rm.addEventListener('click', () => {
-    ranges.splice(ranges.indexOf(r), 1);
-    row.remove();
-    syncHighlights();
-    syncBtn();
+    removeRange(r);
+    syncAll();
     queueRender();
   });
 
-  row.append(field('From', 'from'), field('To', 'to'), rm);
+  row.append(chip, field('From', 'from'), field('To', 'to'), rm);
   rangeList.append(row);
-  syncBtn();
+  return r;
+}
+
+function setSource(r, src) {
+  r.src = src;
+  r.from = Math.min(r.from, src.pages);
+  r.to = Math.min(r.to, src.pages);
+  r.inputs.forEach(i => { i.value = r[i.dataset.key]; });
+  syncAll();
+  goto(r, 'from');
+}
+
+function removeRange(r) {
+  if (menuFor === r) closeMenu();
+  ranges.splice(ranges.indexOf(r), 1);
+  r.row.remove();
 }
 
 addBtn.addEventListener('click', () => {
-  const last = ranges[ranges.length - 1];
-  const from = last ? Math.min(last.to + 1, totalPgs || 1) : 1;
-  addRange(from, totalPgs || from);
-  syncHighlights();
-  jump(from);
+  const src = active ?? sources[0];
+  if (!src) return;
+  const last = ranges.filter(r => r.src === src).pop();
+  const from = last ? Math.min(last.to + 1, src.pages) : 1;
+  const r = addRange(src, from, src.pages);
+  syncAll();
+  goto(r, 'from');
 });
 
 function invalid(r) {
-  if (!totalPgs) return false;
-  return r.from > r.to || r.to > totalPgs || r.from < 1;
+  return r.from < 1 || r.from > r.to || r.to > r.src.pages;
 }
 
-function selectedPages() {
+function syncErrors(r) {
+  r.inputs.forEach(i => i.classList.toggle('err', invalid(r)));
+}
+
+function selected() {
   const out = [];
   for (const r of ranges) {
     if (invalid(r)) continue;
-    for (let p = r.from; p <= r.to; p++) out.push(p);
+    for (let p = r.from; p <= r.to; p++) out.push([r.src, p]);
   }
   return out;
 }
 
+function activePages() {
+  const set = new Set();
+  for (const r of ranges) {
+    if (r.src !== active || invalid(r)) continue;
+    for (let p = r.from; p <= r.to; p++) set.add(p);
+  }
+  return set;
+}
+
+function syncAll() {
+  const any = sources.length > 0;
+  app.classList.toggle('multi', sources.length > 1);
+  dropzone.style.display = any ? 'none' : '';
+  addSrcBtn.style.display = any ? '' : 'none';
+  addBtn.disabled = !any;
+  sources.forEach(s => s.row.classList.toggle('active', s === active));
+  previewSrc.textContent = active ? `${active.tag} \xb7 ${active.name}` : '';
+  ranges.forEach(r => {
+    r.chip.textContent = r.src.tag;
+    r.chip.title = r.src.name;
+    syncErrors(r);
+  });
+  syncHighlights();
+  syncBtn();
+}
+
 function syncBtn() {
-  const n = selectedPages().length;
-  extractBtn.disabled = !plibDoc || n === 0;
+  const n = selected().length;
+  extractBtn.disabled = n === 0;
   hint.textContent = n > 0 ? `${n} page${n !== 1 ? 's' : ''} selected`
-                           : (plibDoc ? 'no valid ranges' : '');
+                           : (sources.length ? 'no valid ranges' : '');
   if (nUp === 1) {
     note.textContent = n > 0 ? `output: ${n} sheet${n !== 1 ? 's' : ''}` : '';
   } else {
@@ -689,50 +862,76 @@ function syncBtn() {
   }
 }
 
+function outputName() {
+  const valid = ranges.filter(r => !invalid(r));
+  const seg = r => r.from === r.to ? `p${r.from}` : `p${r.from}-${r.to}`;
+  const groups = [];
+  for (const r of valid) {
+    const g = groups[groups.length - 1];
+    if (g && g.src === r.src) g.parts.push(seg(r));
+    else groups.push({ src: r.src, parts: [seg(r)] });
+  }
+  const single = new Set(valid.map(r => r.src)).size === 1;
+  const name = single
+    ? `${groups[0].src.base}_${groups.flatMap(g => g.parts).join('_')}`
+    : groups.map(g => `${g.src.base.slice(0, 24)}_${g.parts.join('_')}`).join('+');
+  return `${name}${nUp > 1 ? `_${nUp}up` : ''}.pdf`;
+}
+
 extractBtn.addEventListener('click', async () => {
-  const pages = selectedPages();
-  if (!plibDoc || pages.length === 0) return;
-  showStatus('Extracting\u2026');
+  const pages = selected();
+  if (pages.length === 0) return;
+  showStatus('Extracting…');
   extractBtn.disabled = true;
   try {
     const out = await PDFDocument.create();
-    const idx = pages.map(p => p - 1);
+    const bySrc = new Map();
+    for (const [src, p] of pages) {
+      if (!bySrc.has(src)) bySrc.set(src, []);
+      bySrc.get(src).push(p - 1);
+    }
+
+    const made = new Map();
+    for (const [src, idx] of bySrc) {
+      if (nUp === 1) {
+        made.set(src, await out.copyPages(src.plib, idx));
+      } else {
+        const srcPages = idx.map(i => src.plib.getPage(i));
+        const boxes = srcPages.map(p => {
+          const b = p.getCropBox();
+          return { left: b.x, bottom: b.y, right: b.x + b.width, top: b.y + b.height };
+        });
+        made.set(src, await out.embedPages(srcPages, boxes));
+      }
+    }
+    const cursor = new Map();
+    const ordered = pages.map(([src]) => {
+      const k = cursor.get(src) ?? 0;
+      cursor.set(src, k + 1);
+      return made.get(src)[k];
+    });
 
     if (nUp === 1) {
-      const copied = await out.copyPages(plibDoc, idx);
-      copied.forEach(p => out.addPage(p));
+      ordered.forEach(p => out.addPage(p));
     } else {
-      const [cols, rows] = LAYOUTS[nUp];
-      const srcPages = idx.map(i => plibDoc.getPage(i));
-      const boxes = srcPages.map(p => {
-        const b = p.getCropBox();
-        return { left: b.x, bottom: b.y, right: b.x + b.width, top: b.y + b.height };
-      });
-      const embedded = await out.embedPages(srcPages, boxes);
-      const cellW = Math.max(...embedded.map(e => e.width));
-      const cellH = Math.max(...embedded.map(e => e.height));
-
-      for (let i = 0; i < embedded.length; i += nUp) {
-        const group = embedded.slice(i, i + nUp);
-        const sheet = out.addPage([cellW * cols, cellH * rows]);
-        group.forEach((emb, j) => {
-          const c = j % cols, r = Math.floor(j / cols);
+      const [c, rws] = LAYOUTS[nUp];
+      const cellW = Math.max(...ordered.map(e => e.width));
+      const cellH = Math.max(...ordered.map(e => e.height));
+      for (let i = 0; i < ordered.length; i += nUp) {
+        const sheet = out.addPage([cellW * c, cellH * rws]);
+        ordered.slice(i, i + nUp).forEach((emb, j) => {
+          const col = j % c, row = Math.floor(j / c);
           sheet.drawPage(emb, {
-            x: c * cellW + (cellW - emb.width) / 2,
-            y: (rows - 1 - r) * cellH + (cellH - emb.height) / 2
+            x: col * cellW + (cellW - emb.width) / 2,
+            y: (rws - 1 - row) * cellH + (cellH - emb.height) / 2
           });
         });
       }
     }
 
     const bytes = await out.save();
-    const rangeStr = ranges
-      .filter(r => !invalid(r))
-      .map(r => r.from === r.to ? `p${r.from}` : `p${r.from}-${r.to}`)
-      .join('_');
-    const suffix = nUp > 1 ? `_${nUp}up` : '';
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-    Object.assign(document.createElement('a'), { href: url, download: `${currentFile}_${rangeStr}${suffix}.pdf` }).click();
+    Object.assign(document.createElement('a'), { href: url, download: outputName() }).click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (err) {
     alert('Extraction failed: ' + err.message);
@@ -744,14 +943,14 @@ extractBtn.addEventListener('click', async () => {
 function showStatus(msg) {
   statusTxt.textContent = msg;
   statusEl.classList.add('on');
-  $('app').style.gridTemplateRows = '57px 1fr auto';
+  app.style.gridTemplateRows = '57px 1fr auto';
 }
 function clearStatus() {
   statusEl.classList.remove('on');
-  $('app').style.gridTemplateRows = '57px 1fr';
+  app.style.gridTemplateRows = '57px 1fr';
 }
 
-syncBtn();
+syncAll();
 </script>
 </body>
 </html>
