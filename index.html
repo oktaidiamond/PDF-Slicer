@@ -128,11 +128,11 @@ header h1 {
 
 .range-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 28px;
+  grid-template-columns: 1fr 1fr 28px 28px;
   gap: 5px;
   align-items: end;
 }
-.multi .range-row { grid-template-columns: 32px 1fr 1fr 28px; }
+.multi .range-row { grid-template-columns: 32px 1fr 1fr 28px 28px; }
 .src-chip {
   display: none; height: 32px; font-size: 11px;
   background: var(--bg-2); border: 1px solid var(--bg-3); cursor: pointer;
@@ -188,6 +188,19 @@ header h1 {
 }
 .rm-btn:hover { color: var(--red); background: #2a1a1a; }
 
+.rot-btn {
+  position: relative;
+  background: none; border: none; width: 28px; height: 28px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--ink-3); border-radius: var(--r);
+  font-family: var(--mono); font-size: 10px;
+  transition: color .12s, background .12s;
+}
+.rot-btn:hover { color: var(--ink); background: var(--bg-3); }
+.rot-btn.on { color: var(--blue); }
+.rot-btn svg { margin: 0 4px 3px 0; }
+.rot-btn span { position: absolute; right: 2px; bottom: 1px; font-size: 9px; line-height: 1; }
+
 .add-btn {
   margin-top: 8px; width: 100%;
   background: none; border: 1.5px dashed var(--bg-3); border-radius: var(--r);
@@ -222,6 +235,7 @@ header h1 {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .multi .preview-src { display: block; }
+.app:not(.multi) .view-btns { display: none; }
 .preview-top-right { display: flex; align-items: center; gap: 12px; }
 .legend { display: none; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue-glow); border: 1.5px solid var(--blue); }
@@ -361,6 +375,10 @@ header h1 {
       </div>
       <div class="preview-top-right">
         <div class="legend" id="legend"><div class="legend-dot"></div>in range</div>
+        <div class="scale-btns view-btns" id="view-btns">
+          <button class="scale-btn active" data-v="source">Source</button>
+          <button class="scale-btn" data-v="result">Result</button>
+        </div>
         <div class="scale-btns" id="scale-btns">
           <button class="scale-btn" data-c="5">XS</button>
           <button class="scale-btn" data-c="4">S</button>
@@ -393,16 +411,17 @@ if (!globalThis.pdfjsLib || !globalThis.PDFLib) {
   document.querySelector('#empty p').textContent = "Couldn't load the PDF libraries. Check your connection and reload.";
   throw new Error('PDF libraries failed to load');
 }
-const { PDFDocument } = PDFLib;
+const { PDFDocument, degrees } = PDFLib;
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 
 const WORKERS = 4;
 const LAYOUTS = { 2: [[1, 2], [2, 1]], 4: [[2, 2]], 6: [[2, 3], [3, 2]], 9: [[3, 3]] };
 const JUMP_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ROT_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
 const FILE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 
 const sources = [], ranges = [];
-let active = null, thumbs = [];
+let active = null, thumbs = [], mode = 'source', resultKey = '';
 let gridId = 0, focusPage = 1, inflight = 0, pumpQueued = false;
 const nearSet = new Set();
 let cols = 2, nUp = 1;
@@ -468,6 +487,27 @@ $('scale-btns').addEventListener('click', async e => {
   const target = focusPage, frac = pageFraction(target);
   buildGrid();
   restoreScroll(target, frac);
+});
+
+$('view-btns').addEventListener('click', e => {
+  const btn = e.target.closest('.scale-btn');
+  if (!btn || btn.dataset.v === mode) return;
+  if (btn.dataset.v === 'result') {
+    if (active && thumbs.length) {
+      active.focus = focusPage;
+      active.frac = pageFraction(focusPage);
+    }
+    mode = 'result';
+    focusPage = 1;
+    syncAll();
+    buildGrid();
+    grid.scrollTop = 0;
+    schedulePump();
+  } else if (active) {
+    const src = active;
+    active = null;
+    show(src);
+  }
 });
 
 $('nup-btns').addEventListener('click', e => {
@@ -550,8 +590,18 @@ function pageAspects(plib) {
   return plib.getPages().map(p => {
     const b = p.getCropBox();
     const rot = ((p.getRotation().angle % 360) + 360) % 360;
-    return rot % 180 ? `${b.height} / ${b.width}` : `${b.width} / ${b.height}`;
+    return rot % 180 ? [b.height, b.width] : [b.width, b.height];
   });
+}
+
+function aspectOf(src, n, extra) {
+  const [w, h] = src.aspects[n - 1];
+  return extra % 180 ? `${h} / ${w}` : `${w} / ${h}`;
+}
+
+function previewRot(n) {
+  const r = ranges.find(r => r.src === active && !invalid(r) && n >= r.from && n <= r.to);
+  return r ? r.rot : 0;
 }
 
 function addSourceRow(src) {
@@ -572,7 +622,8 @@ function removeSource(src) {
   src.row.remove();
   ranges.filter(r => r.src === src).forEach(removeRange);
   src.pjs.destroy();
-  if (active === src) {
+  if (active === src || (mode === 'result' && sources.length < 2)) {
+    mode = 'source';
     active = null;
     clearGrid();
     if (sources.length) show(sources[0]);
@@ -581,11 +632,12 @@ function removeSource(src) {
 }
 
 async function show(src) {
-  if (active === src) return;
-  if (active && thumbs.length) {
+  if (active === src && mode === 'source') return;
+  if (mode === 'source' && active && thumbs.length) {
     active.focus = focusPage;
     active.frac = pageFraction(focusPage);
   }
+  mode = 'source';
   active = src;
   focusPage = src.focus;
   syncAll();
@@ -639,25 +691,29 @@ function clearGrid() {
 
 function buildGrid() {
   clearGrid();
-  const src = active;
+  const result = mode === 'result';
+  const items = result ? selected() : null;
+  resultKey = result ? itemsKey(items) : '';
+  const total = result ? items.length : active.pages;
   grid.style.setProperty('--cols', cols);
   const frag = document.createDocumentFragment();
-  for (let n = 1; n <= src.pages; n++) {
+  for (let n = 1; n <= total; n++) {
+    const [src, pg, rot] = result ? items[n - 1] : [active, n, previewRot(n)];
     const th = document.createElement('div');
     const wrap = document.createElement('div');
     const lbl = document.createElement('div');
     th.className = 'thumb';
     th.dataset.n = n;
     wrap.className = 'thumb-wrap';
-    wrap.style.aspectRatio = src.aspects[n - 1];
+    wrap.style.aspectRatio = aspectOf(src, pg, rot);
     lbl.className = 'thumb-num';
-    lbl.textContent = n;
+    lbl.textContent = result ? `${n} \xb7 ${src.tag}${pg}` : n;
     th.append(wrap, lbl);
     frag.append(th);
-    thumbs[n] = { th, wrap, lbl, state: 0, job: null, task: null, canvas: null };
+    thumbs[n] = { th, wrap, lbl, src, pg, rot, state: 0, job: null, task: null, canvas: null };
   }
   empty.style.display = 'none';
-  legend.style.display = 'flex';
+  legend.style.display = result ? 'none' : 'flex';
   grid.style.display = '';
   grid.append(frag);
   thumbs.forEach(t => { nearIO.observe(t.th); keepIO.observe(t.th); });
@@ -686,9 +742,9 @@ grid.addEventListener('scroll', () => {
   scrollTick = true;
   requestAnimationFrame(() => {
     scrollTick = false;
-    if (!active) return;
+    if (!thumbs.length) return;
     const top = grid.getBoundingClientRect().top;
-    let lo = 1, hi = active.pages, best = focusPage;
+    let lo = 1, hi = thumbs.length - 1, best = focusPage;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
       if (!thumbs[mid]) break;
@@ -708,7 +764,8 @@ function jump(n, smooth = true) {
   schedulePump();
 }
 
-async function goto(r, key) {
+async function goto(r, key, stay) {
+  if (stay && mode === 'result') return;
   await show(r.src);
   if (active === r.src) jump(r[key]);
 }
@@ -737,14 +794,15 @@ function pump() {
 
 async function renderOne(t, n) {
   const job = t.job = {};
-  const doc = active.pjs;
+  const doc = t.src.pjs;
   t.state = 1;
   inflight++;
   let canvas = null;
   try {
-    const page = await doc.getPage(n);
+    const page = await doc.getPage(t.pg);
     if (t.job !== job) return;
-    const vp = page.getViewport({ scale: t.wrap.clientWidth / page.getViewport({ scale: 1 }).width });
+    const rotation = (page.rotate + t.rot) % 360;
+    const vp = page.getViewport({ scale: t.wrap.clientWidth / page.getViewport({ scale: 1, rotation }).width, rotation });
     canvas = document.createElement('canvas');
     canvas.width = Math.round(vp.width);
     canvas.height = Math.round(vp.height);
@@ -769,18 +827,41 @@ async function renderOne(t, n) {
   }
 }
 
+function itemsKey(items) {
+  return items.map(([src, p, r]) => `${src.tag}${p}.${r}`).join(',');
+}
+
 function syncHighlights() {
+  if (mode === 'result') {
+    const items = selected();
+    if (itemsKey(items) !== resultKey) {
+      const target = focusPage, frac = thumbs.length ? pageFraction(target) : 0;
+      buildGrid();
+      if (thumbs[target]) restoreScroll(target, frac);
+      else { focusPage = 1; grid.scrollTop = 0; schedulePump(); }
+    }
+    return;
+  }
   const sel = activePages();
+  let changed = false;
   thumbs.forEach((t, n) => {
     const inR = sel.has(n);
     t.wrap.classList.toggle('in-range', inR);
     t.wrap.classList.toggle('out-of-range', !inR);
     t.lbl.classList.toggle('in-range', inR);
+    const rot = previewRot(n);
+    if (rot !== t.rot) {
+      t.rot = rot;
+      t.wrap.style.aspectRatio = aspectOf(t.src, n, rot);
+      evict(t);
+      changed = true;
+    }
   });
+  if (changed) schedulePump();
 }
 
 function addRange(src, from, to) {
-  const r = { src, from, to, inputs: [] };
+  const r = { src, from, to, rot: 0, inputs: [] };
   ranges.push(r);
   const row = document.createElement('div');
   row.className = 'range-row';
@@ -803,7 +884,7 @@ function addRange(src, from, to) {
     wrap.querySelector('.input-wrap').prepend(inp);
     r.inputs.push(inp);
 
-    inp.addEventListener('focus', () => { inp.select(); show(r.src); });
+    inp.addEventListener('focus', () => { inp.select(); if (mode === 'source') show(r.src); });
     inp.addEventListener('input', () => {
       const v = parseInt(inp.value, 10);
       r[key] = Math.min(Math.max(isNaN(v) ? 1 : v, 1), r.src.pages);
@@ -833,7 +914,22 @@ function addRange(src, from, to) {
     syncAll();
   });
 
-  row.append(chip, field('From', 'from'), field('To', 'to'), rm);
+  const rotBtn = document.createElement('button');
+  rotBtn.className = 'rot-btn';
+  const paintRot = () => {
+    rotBtn.classList.toggle('on', r.rot !== 0);
+    rotBtn.title = r.rot ? `Rotated ${r.rot}\xb0 clockwise. Click to rotate again.` : 'Rotate clockwise';
+    rotBtn.innerHTML = ROT_ICON + (r.rot ? `<span>${r.rot}</span>` : '');
+  };
+  paintRot();
+  rotBtn.addEventListener('click', () => {
+    r.rot = (r.rot + 90) % 360;
+    paintRot();
+    if (mode === 'result' || active === r.src) syncHighlights();
+    else show(r.src);
+  });
+
+  row.append(chip, field('From', 'from'), field('To', 'to'), rotBtn, rm);
   rangeList.append(row);
   return r;
 }
@@ -844,7 +940,7 @@ function setSource(r, src) {
   r.to = Math.min(r.to, src.pages);
   r.inputs.forEach(i => { i.value = r[i.dataset.key]; });
   syncAll();
-  goto(r, 'from');
+  goto(r, 'from', true);
 }
 
 function removeRange(r) {
@@ -860,7 +956,7 @@ addBtn.addEventListener('click', () => {
   const from = last ? Math.min(last.to + 1, src.pages) : 1;
   const r = addRange(src, from, src.pages);
   syncAll();
-  goto(r, 'from');
+  goto(r, 'from', true);
 });
 
 function invalid(r) {
@@ -875,7 +971,7 @@ function selected() {
   const out = [];
   for (const r of ranges) {
     if (invalid(r)) continue;
-    for (let p = r.from; p <= r.to; p++) out.push([r.src, p]);
+    for (let p = r.from; p <= r.to; p++) out.push([r.src, p, r.rot]);
   }
   return out;
 }
@@ -895,8 +991,10 @@ function syncAll() {
   dropzone.style.display = any ? 'none' : '';
   addSrcBtn.style.display = any ? '' : 'none';
   addBtn.disabled = !any;
-  sources.forEach(s => s.row.classList.toggle('active', s === active));
-  previewSrc.textContent = active ? `${active.tag} \xb7 ${active.name}` : '';
+  sources.forEach(s => s.row.classList.toggle('active', mode === 'source' && s === active));
+  $('view-btns').querySelectorAll('.scale-btn').forEach(b => b.classList.toggle('active', b.dataset.v === mode));
+  previewSrc.textContent = mode === 'result' ? `spliced result \xb7 ${selected().length} page${selected().length !== 1 ? 's' : ''}`
+    : active ? `${active.tag} \xb7 ${active.name}` : '';
   ranges.forEach(r => {
     r.chip.textContent = r.src.tag;
     r.chip.title = r.src.name;
@@ -945,22 +1043,33 @@ extractBtn.addEventListener('click', async () => {
   try {
     const out = await PDFDocument.create();
     const bySrc = new Map();
-    for (const [src, p] of pages) {
-      if (!bySrc.has(src)) bySrc.set(src, []);
-      bySrc.get(src).push(p - 1);
+    for (const [src, p, rot] of pages) {
+      if (!bySrc.has(src)) bySrc.set(src, { idx: [], rots: [] });
+      const g = bySrc.get(src);
+      g.idx.push(p - 1);
+      g.rots.push(rot);
     }
 
+    const norm = a => ((a % 360) + 360) % 360;
     const made = new Map();
-    for (const [src, idx] of bySrc) {
+    for (const [src, { idx, rots }] of bySrc) {
       if (nUp === 1) {
-        made.set(src, await out.copyPages(src.plib, idx));
+        const copied = await out.copyPages(src.plib, idx);
+        copied.forEach((pg, k) => {
+          if (rots[k]) pg.setRotation(degrees(norm(pg.getRotation().angle + rots[k])));
+        });
+        made.set(src, copied);
       } else {
         const srcPages = idx.map(i => src.plib.getPage(i));
         const boxes = srcPages.map(p => {
           const b = p.getCropBox();
           return { left: b.x, bottom: b.y, right: b.x + b.width, top: b.y + b.height };
         });
-        made.set(src, await out.embedPages(srcPages, boxes));
+        const embs = await out.embedPages(srcPages, boxes);
+        made.set(src, embs.map((emb, k) => ({
+          emb,
+          rot: norm(srcPages[k].getRotation().angle + rots[k])
+        })));
       }
     }
     const cursor = new Map();
@@ -973,18 +1082,20 @@ extractBtn.addEventListener('click', async () => {
     if (nUp === 1) {
       ordered.forEach(p => out.addPage(p));
     } else {
-      const cellW = Math.max(...ordered.map(e => e.width));
-      const cellH = Math.max(...ordered.map(e => e.height));
+      const dims = ordered.map(({ emb, rot }) => rot % 180 ? [emb.height, emb.width] : [emb.width, emb.height]);
+      const cellW = Math.max(...dims.map(d => d[0]));
+      const cellH = Math.max(...dims.map(d => d[1]));
       const squareness = ([c, r]) => Math.abs(Math.log((c * cellW) / (r * cellH)));
       const [c, rws] = LAYOUTS[nUp].reduce((a, b) => squareness(b) < squareness(a) ? b : a);
       for (let i = 0; i < ordered.length; i += nUp) {
         const sheet = out.addPage([cellW * c, cellH * rws]);
-        ordered.slice(i, i + nUp).forEach((emb, j) => {
+        ordered.slice(i, i + nUp).forEach(({ emb, rot }, j) => {
           const col = j % c, row = Math.floor(j / c);
-          sheet.drawPage(emb, {
-            x: col * cellW + (cellW - emb.width) / 2,
-            y: (rws - 1 - row) * cellH + (cellH - emb.height) / 2
-          });
+          const [w, h] = dims[i + j];
+          const x0 = col * cellW + (cellW - w) / 2;
+          const y0 = (rws - 1 - row) * cellH + (cellH - h) / 2;
+          const [dx, dy] = { 0: [0, 0], 90: [0, emb.width], 180: [emb.width, emb.height], 270: [emb.height, 0] }[rot];
+          sheet.drawPage(emb, { x: x0 + dx, y: y0 + dy, rotate: degrees(-rot) });
         });
       }
     }
