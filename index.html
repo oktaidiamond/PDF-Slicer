@@ -1112,7 +1112,7 @@ function syncBtn() {
 
 function outputName() {
   const valid = ranges.filter(r => !invalid(r));
-  const seg = r => r.from === r.to ? `p${r.from}` : `p${r.from}-${r.to}`;
+  const seg = r => r.from === r.to ? `p${r.from}` : `pp${r.from}-${r.to}`;
   const groups = [];
   for (const r of valid) {
     const g = groups[groups.length - 1];
@@ -1121,9 +1121,9 @@ function outputName() {
   }
   const single = new Set(valid.map(r => r.src)).size === 1;
   const name = single
-    ? `${groups[0].src.base}_${groups.flatMap(g => g.parts).join('_')}`
-    : groups.map(g => `${g.src.base.slice(0, 24)}_${g.parts.join('_')}`).join('+');
-  return `${name}${nUp > 1 ? `_${nUp}up` : ''}`;
+    ? `${groups[0].src.base} (${groups.flatMap(g => g.parts).join(', ')})`
+    : groups.map(g => `${g.src.base.slice(0, 24)} (${g.parts.join(', ')})`).join(', ');
+  return `${name}${nUp > 1 ? ` (${nUp}up)` : ''}`;
 }
 
 function saveBlob(blob, name) {
